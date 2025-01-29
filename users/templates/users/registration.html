@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 h-screen flex items-center justify-center">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-xs">
+        <h1 class="text-xl font-bold text-center mb-4">Register</h1>
+        <form method="POST" action="{% url 'register' %}">
+            {% csrf_token %}
+            <div class="mb-3 flex space-x-2">
+                <div class="w-1/2">
+                    <label for="firstName" class="block text-xs font-medium text-gray-700 mb-1">First Name</label>
+                    {{ form.first_name }}
+                </div>
+                <div class="w-1/2">
+                    <label for="lastName" class="block text-xs font-medium text-gray-700 mb-1">Last Name</label>
+                    {{ form.last_name }}
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="username" class="block text-xs font-medium text-gray-700 mb-1">Username</label>
+                {{ form.username }}
+            </div>
+            <div class="mb-3">
+                <label for="email" class="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                {{ form.email }}
+            </div>
+            <div class="mb-3">
+                <label for="password1" class="block text-xs font-medium text-gray-700 mb-1">Password</label>
+                {{ form.password1 }}
+            </div>
+            <div class="mb-3">
+                <label for="password2" class="block text-xs font-medium text-gray-700 mb-1">Confirm Password</label>
+                {{ form.password2 }}
+            </div>
+            <p class="text-red-500 text-xs block font-medium text-gray-700 mb-2">{{ form.error }}</p>
+            <button type="submit"
+                class="w-full bg-blue-500 text-white font-bold py-1.5 rounded-lg hover:bg-blue-600 transition text-sm">
+                Register
+            </button>
+        </form>
+        <p class="text-xs text-center text-gray-600 mt-3">
+            Already have an account? <a href="{% url 'login' %}"
+                class="text-blue-500 font-medium hover:underline">Login</a>
+        </p>
+    </div>
+</body>
+
+</html>
