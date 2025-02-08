@@ -1,11 +1,14 @@
 from django.shortcuts import render
 from django.views import View
-from .algorithm import RandomForest
 from .models import StockData
-import numpy as np
 import os
 import pandas as pd
 import joblib
+import matplotlib
+import matplotlib.pyplot as plt
+matplotlib.use('Agg')
+import seaborn as sns
+from django.conf import settings
 
 # Create your views here.
 
@@ -21,86 +24,54 @@ class HomeView(View):
 
 class PredictionView(View):
     def get(self, request):
-
         stock_symbol = request.GET.get('stockSymbol', None)
 
+        # Check if the trained model exists
         model_path = f"predictor/trained_models/{stock_symbol}_model.pkl"
         if not os.path.exists(model_path):
             return render(request, "predictor/result.html", {"error": f"No trained model found for {stock_symbol}."})
-        
-        stock_data = StockData.objects.filter(symbol=stock_symbol).values("open_price", "high", "low", "close_price")
+
+        # Fetch stock data (including date and close price)
+        stock_data = StockData.objects.filter(symbol=stock_symbol).values("date", "close_price", "open_price", "high", "low")
+
         if not stock_data.exists():
             return render(request, "predictor/result.html", {"error": "No data available for this stock."})
-        
-        df = pd.DataFrame.from_records(stock_data)
 
+        df = pd.DataFrame.from_records(stock_data)
+        df["date"] = pd.to_datetime(df["date"])  # Convert date to datetime
+        df = df.sort_values("date")  # Sort by date
+
+        # Load trained model and accuracy
         model_data = joblib.load(model_path)
         clf = model_data["model"]
         accuracy = model_data["accuracy"]
 
+        # Prepare data for prediction
         X = df[["open_price", "high", "low", "close_price"]].values
-    
         prediction = clf.predict(X[-1].reshape(1, -1))[0]
         result = "Increase" if prediction == 1 else "Decrease"
 
-        return render(request, "predictor/result.html", {"prediction": result, "accuracy": round(accuracy * 100, 2), "symbol": stock_symbol})
-        # stock_symbol = request.GET.get('stockSymbol', None)
+        # Generate line chart for Closing Price trend
+        plt.figure(figsize=(8, 4))
+        sns.lineplot(x=df["date"], y=df["close_price"], marker="o", linestyle="-", color="blue")
+        plt.xlabel("Date")
+        plt.ylabel("Closing Price")
+        plt.title(f"Closing Price Trend for {stock_symbol}")
+        plt.xticks(rotation=45)
+        plt.grid(True)
 
-        # # Validate the stock symbol
-        # if not stock_symbol:
-        #     return render(request, 'predictor/result.html', {
-        #         'error': 'No stock symbol selected.'
-        #     })
-        
-        # # Fetch data for the selected stock symbol using ORM
-        # stock_data = StockData.objects.filter(symbol=stock_symbol).values(
-        #     'open_price', 'high', 'low', 'close_price', 'percent_change'
-        # )
+        # Save plot to static folder
+        if not os.path.exists(settings.MEDIA_ROOT):
+            os.makedirs(settings.MEDIA_ROOT)
 
-        # if not stock_data.exists():
-        #     return render(request, 'predictor/result.html', {
-        #         'error': f'No data found for the stock symbol: {stock_symbol}.'
-        #     })
-        
-        # data = np.array([[
-        #     record['open_price'],
-        #     record['high'],
-        #     record['low'],
-        #     record['close_price'],
-        #     record['percent_change']
-        # ] for record in stock_data])
+        plot_path = os.path.join(settings.MEDIA_ROOT, f"{stock_symbol}_trend.png")
+        plt.savefig(plot_path)
+        plt.close()
 
-        # # Extract features and target
-        # X = data[:, :-1]  # Features (Open, High, Low, Close)
-        # y = (data[:, -1] > 0).astype(int)  # Target (Positive Percent Change)
-
-        # # Split data into training and testing sets
-        # np.random.seed(1234)
-        # indices = np.arange(X.shape[0])
-        # np.random.shuffle(indices)
-        # split_idx = int(0.8 * len(indices))
-        # train_indices, test_indices = indices[:split_idx], indices[split_idx:]
-        # X_train, X_test = X[train_indices], X[test_indices]
-        # y_train, y_test = y[train_indices], y[test_indices]
-
-        # # Train RandomForest
-        # clf = RandomForest(n_trees=20)
-        # clf.fit(X_train, y_train)
-
-        # # Predict on test set
-        # predictions = clf.predict(X_test)
-
-        # # Calculate accuracy
-        # accuracy = np.sum(y_test == predictions) / len(y_test)
-
-        # # Predict next movement for the last row in the dataset
-        # last_row = X[-1].reshape(1, -1)
-        # next_movement = clf.predict(last_row)[0]
-        # result = "Yes" if next_movement == 1 else "No"
-
-        # # Pass data to template
-        # return render(request, 'predictor/result.html', {
-        #     'result': result,
-        #     'accuracy': round(accuracy * 100, 2),
-        #     'symbol': stock_symbol
-        # })
+        # Pass data to template
+        return render(request, "predictor/result.html", {
+            "prediction": result,
+            "accuracy": round(accuracy * 100, 2),
+            "symbol": stock_symbol,
+            "plot_url": f"/media/{stock_symbol}_trend.png"
+        })

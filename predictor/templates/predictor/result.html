@@ -29,7 +29,16 @@
                 <span class="text-blue-500 font-semibold">{{ accuracy }}%</span>
             </p>
         </div>
+
+        <div class="mt-6">
+            <h2 class="text-lg font-bold mb-2">Stock Price Trend</h2>
+            {% if plot_url %}
+            <img src="{{ plot_url }}" alt="Stock Price Trend" class="w-full rounded-lg shadow-md">
+            {% endif %}
+        </div>
+
         {% endif %}
+
         <a href="{% url 'home' %}" class="text-blue-500 mt-4 inline-block hover:underline">
             Back to Stock Selection
         </a>

@@ -69,21 +69,17 @@ class DecisionTree:
         return left_idxs, right_idxs
 
     def _entropy(self, y):
-        y = y.astype(int)  # ✅ Ensures `y` is integer
+        y = y.astype(int)  
         hist = np.bincount(y)
         ps = hist / len(y)
         return -np.sum([p * np.log(p) for p in ps if p > 0])
-        # hist = np.bincount(y)
-        # ps = hist / len(y)
-        # return -np.sum([p * np.log(p) for p in ps if p > 0])
 
     def _most_common_label(self, y):
         counter = Counter(y)
-        if not counter:  # ✅ Fix: Check if y is empty
-            return None  # Return None instead of causing IndexError
+        if not counter: 
+            return None  
         return counter.most_common(1)[0][0]
-        # counter = Counter(y)
-        # return counter.most_common(1)[0][0]
+       
 
     def predict(self, X):
         return np.array([self._traverse_tree(x, self.root) for x in X])
@@ -123,11 +119,9 @@ class RandomForest:
 
     def _most_common_label(self, y):
         counter = Counter(y)
-        if not counter:  # ✅ Fix: Check if y is empty
-            return None  # Return None instead of causing IndexError
+        if not counter:  
+            return None  
         return counter.most_common(1)[0][0]
-        # counter = Counter(y)
-        # return counter.most_common(1)[0][0]
 
     def predict(self, X):
         predictions = np.array([tree.predict(X) for tree in self.trees])
