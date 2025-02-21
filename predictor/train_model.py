@@ -6,14 +6,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'spp.settings')
 django.setup()
 
-from predictor.algorithm import RandomForest
 from predictor.models import StockData
 import joblib
 import pandas as pd
 import numpy as np
+from sklearn.ensemble import RandomForestRegressor
 
 def train_and_save_model():
-    stock_data = StockData.objects.all().values("symbol", "open_price", "high", "low", "close_price", "percent_change")
+    stock_data = StockData.objects.all().values("symbol", "open_price", "high", "low", "close_price", "volume")
 
     if not stock_data.exists():
         print('No data found.')
@@ -26,20 +26,23 @@ def train_and_save_model():
     for symbol in stock_symbols:
         print(f"Training model for {symbol}...")
 
-        stock_df = df[df["symbol"] == symbol]
+        stock_df = df[df["symbol"] == symbol].copy()  # Added .copy() to avoid SettingWithCopyWarning
+        
+        # Create target variable as next day's closing price
+        stock_df['next_day_close'] = stock_df['close_price'].shift(-1)
+        
+        # Drop the last row since it won't have a next day's close price
+        stock_df = stock_df.dropna()
 
         # Feature selection
-        features = ["open_price", "high", "low", "close_price"]
-        target = "percent_change"
-
-        # Convert percent change into binary labels
-        stock_df.loc[:, target] = (stock_df[target] > 0).astype(int)  # Ensures binary (0,1)
+        features = ["open_price", "high", "low", "close_price", "volume"]
+        target = "next_day_close"
 
         X = stock_df[features].values
-        y = stock_df[target].values.astype(int)
+        y = stock_df[target].values
 
         # Prevent empty dataset errors
-        if len(X) == 0 or len(y) == 0:  # ✅ Fix
+        if len(X) == 0 or len(y) == 0: 
             print(f"Skipping {symbol} because it has no valid data.")
             continue
 
@@ -53,17 +56,23 @@ def train_and_save_model():
         X_train, X_test = X[train_idx], X[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
 
-        # Train the model
-        clf = RandomForest(n_trees=20)
+        # Train the model using sklearn's RandomForestRegressor
+        clf = RandomForestRegressor(n_estimators=100, random_state=42)  # Increased n_estimators for better performance
         clf.fit(X_train, y_train)
 
-        # Calculate accuracy
-        predictions = clf.predict(X_test)
-        accuracy = np.sum(y_test == predictions) / len(y_test)
-        print(f"Accuracy for {symbol}: {accuracy:.2%}")
+        # Calculate R-squared score
+        r2_score = clf.score(X_test, y_test)
+        
+        # Calculate Mean Absolute Percentage Error (MAPE)
+        y_pred = clf.predict(X_test)
+        mape = np.mean(np.abs((y_test - y_pred) / y_test)) * 100
 
         # Save model
-        model_data = {"model": clf, "accuracy": accuracy}
+        model_data = {
+            "model": clf, 
+            "r2_score": r2_score,
+            "mape": mape
+        }
         model_path = f"predictor/trained_models/{symbol}_model.pkl"
         joblib.dump(model_data, model_path)
         print(f"Model for {symbol} saved at {model_path}")
